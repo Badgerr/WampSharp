@@ -8,12 +8,12 @@ namespace WampSharp
 	{
 		ChallengeResult Authenticate(string challenge, ChallengeDetails extra);
 
-        string[] AuthenticationMethod
+        string[] AuthenticationMethods
         {
             get;
         }
 
-        string AutenticationId
+        string AuthenticationId
         {
             get;
         }
@@ -69,12 +69,12 @@ namespace WampSharp
             throw new WampAuthenticationException("Authorization was requested but no authenticator was provided");
         }
 
-        public string[] AuthenticationMethod
+        public string[] AuthenticationMethods
         {
             get { return null; }
         }
 
-        public string AutenticationId
+        public string AuthenticationId
         {
             get { return null; }
         }

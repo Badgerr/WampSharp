@@ -18,62 +18,82 @@ namespace WampSharp.Samples.Authentication
 
     public class CustomAuthenticator : IWampClientAutenticator
     {
-        private string[] authenticationMethod;
-        private string autenticationId;
-
-        public CustomAuthenticator(string[] authenticationMethod, string autenticationId)
+        private string[] authenticationMethods;
+        private IDictionary<string, string> tickets = new Dictionary<string, string>()
         {
-            this.autenticationId = autenticationId;
-            this.authenticationMethod = authenticationMethod;
+            { "peter", "md5f39d45e1da71cf755a7ee5d5840c7b0d" },
+            { "joe", "magic_secret_2" }
+        };
+        private string user = "peter";
+
+        public CustomAuthenticator()
+        {
+            this.authenticationMethods = new string[] { "ticket" };
         }
 
         public ChallengeResult Authenticate(string challenge, ChallengeDetails extra)
         {
             var challengeExtra = extra.OriginalValue.Deserialize<IDictionary<string, object>>();
+
             var method = (string)challengeExtra["authmethod"];
-            if (method != "ticket")
+            Console.WriteLine(method);
+            foreach (var ce in challengeExtra)
+            {
+                Console.WriteLine(ce);
+            }
+
+            if (method == "ticket")
+            {
+                Console.WriteLine("authenticating via '" + method + "'");
+                var result = new ChallengeResult();
+                result.Signature = tickets[user];
+                result.Extra = new Dictionary<string, object>() { };
+                return result;
+            }
+            else
             {
                 throw new WampAuthenticationException("don't know how to authenticate using '" + method + "'");
             }
-
-            var result = new ChallengeResult();
-            result.Signature = "md5f39d45e1da71cf755a7ee5d5840c7b0d";
-            result.Extra = new Dictionary<string, object>() { };
-            return result;
         }
 
-        public string[] AuthenticationMethod
+        public string[] AuthenticationMethods
         {
-            get { return authenticationMethod; }
+            get { return authenticationMethods; }
         }
 
-        public string AutenticationId
+        public string AuthenticationId
         {
-            get { return autenticationId; }
+            get { return user; }
         }
     }
 
     class Program
     {
+        private static IWampRealmProxy proxy;
+
         private static void Test(IWampRealmServiceProvider serviceProvider)
         {
             IArgumentsService proxy = serviceProvider.GetCalleeProxy<IArgumentsService>();
-            var time = proxy.timeservice();
-            Console.WriteLine("call result {0}", time);
+            string now;
+            try
+            {
+                now = proxy.timeservice();
+                Console.WriteLine("call result {0}", now);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("call error {0}", e);
+            }
         }
-
-        private static IWampRealmProxy proxy;
 
         static void Main(string[] args)
         {
             string url = "ws://127.0.0.1:8080/";
             string realm = "integra-s";
-            string[] authmethods = new string[] { "ticket" };
-            string authid = "peter";
 
             DefaultWampChannelFactory channelFactory = new DefaultWampChannelFactory();
 
-            var authenticator = new CustomAuthenticator(new string[] { "custom-auth" }, authid);
+            IWampClientAutenticator authenticator = new CustomAuthenticator();
             IWampChannel channel = channelFactory.CreateJsonChannel(url, realm, authenticator);
             channel.RealmProxy.Monitor.ConnectionEstablished += Monitor_ConnectionEstablished;
             channel.RealmProxy.Monitor.ConnectionBroken += Monitor_ConnectionBroken;
@@ -96,7 +116,7 @@ namespace WampSharp.Samples.Authentication
 
         static void Monitor_ConnectionBroken(object sender, V2.Realm.WampSessionCloseEventArgs e)
         {
-            Console.WriteLine("disconnected '" + e.Reason);
+            Console.WriteLine("disconnected {0}", e.Reason);
         }
     }
 }
